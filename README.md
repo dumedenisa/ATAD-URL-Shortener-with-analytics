@@ -72,8 +72,10 @@ go test ./...
 go test -race ./...
 ```
 
-`cmd/app` contains startup and HTTP routing. `internal/version` provides build
-metadata. Add application packages under `internal/` as implementation progresses.
+`cmd/app` handles process startup and graceful shutdown. `internal/httpapi`
+constructs the HTTP handler and tests the common routes without a network listener.
+`internal/version` provides build metadata. Add application packages under
+`internal/` as implementation progresses.
 Local data, credentials, and build output must stay outside version control.
 
 ## Submission documentation
