@@ -1,62 +1,85 @@
-# [Project title]
+# URL Shortener with Analytics
 
-[One paragraph: what this program does and who would use it. Replace this
-whole file — it is your project's front door, and it is marked.]
+ATAD 2026–2027, project 1: a Go service that will create short links, redirect
+visitors to their original URLs, and report visit statistics for each link.
 
-- **Student:** [Surname Firstname], group [group]
-- **Project:** [number and title from the project description]
+- **Student:** Dume Denisa
+- **Group:** -
 - **Language:** Go
+- **HTTP port:** 8080
 
-## What it does
+## Current status
 
-[Two or three paragraphs. What problem it solves, what it does not do, and
-what state it is in.]
+The repository contains the initial HTTP service and project metadata. The common
+routes are available: `GET /health`, `GET /version`, `GET /`, and `POST /reset`.
+The reset route currently returns 204; there is no application state to clear yet.
+Link creation, redirects, analytics, and persistence are not implemented yet.
 
-## How to run it
+The planned API is `POST /links`, `GET /links`, `GET /{code}`,
+`GET /links/{code}/stats`, and `DELETE /links/{code}`. Generated codes will contain
+7 characters; custom codes must contain 4–10 letters, digits, hyphens or underscores.
 
+## Run with Docker
+
+Build the image locally from the repository root:
+
+```sh
+docker build -t atad-url-shortener:local .
+docker run --rm -p 8080:8080 atad-url-shortener:local
 ```
-docker run --rm -p 8080:8080 ghcr.io/[user]/[repo]:latest
-```
 
-To build and run without Docker:
+No published image is required for these commands. The Dockerfile currently
+requires the `golang:1.27-alpine` build image specified by the starter template.
+Build metadata can be supplied through the `COMMIT` and `BUILT_AT` build arguments.
+The build injects these values into the binary used by `/version` and `--version`.
 
-```
+## Run without Docker
+
+Install the Go version specified in `go.mod` (currently 1.27), then run:
+
+```sh
 go run ./cmd/app
-go run ./cmd/app --version
 ```
 
-## What you should see
+In another terminal:
 
-[What a successful run looks like. If it is a service, one request and its
-response. If it is a tool, one command and its output. A reader who has never
-seen your project must be able to tell whether it worked.]
+```sh
+curl -i http://localhost:8080/health
+curl -i http://localhost:8080/version
+curl -i http://localhost:8080/
+curl -i -X POST http://localhost:8080/reset
+```
 
----
+`/health` returns HTTP 200 and JSON such as
+`{"status":"ok","uptime_seconds":3}`. `/version` returns `app`, `version`,
+`commit`, and `built_at`; `/` returns an HTML identity page; `/reset` returns
+HTTP 204 with no response body.
 
-## Before you delete these notes
+To inspect the version without starting the server:
 
-**Fill in `atad.json` first.** Name, group, student id, email, project number
-and title, language, and the command that runs your project. The marking script reads this file. A field left as
-`[placeholder]` counts as missing.
+```sh
+go run ./cmd/app --version
+docker run --rm atad-url-shortener:local --version
+```
 
-**`--version` is part of the contract.** It must print one line of JSON with
-`app`, `version`, `commit` and `built_at`, and exit 0. The `commit` value is
-stamped into the binary by the Dockerfile from the SHA that CI supplies, which
-is how it is proved that the published image was built from the code you
-submitted. Do not print it yourself, and do not remove the test that checks it.
+Local builds may report `unknown` for the commit and an empty build timestamp
+when build metadata is unavailable.
 
-**The four contract routes are not optional.** `/health`, `/version`, `/` and
-`POST /reset` must answer exactly as the project document specifies, in every
-project. They are checked automatically, and a right answer with the wrong
-status code is a wrong answer.
+## Development
 
-**Layout.** `cmd/app` is the entry point, `internal/` is your own packages,
-and `docs/` holds your documentation. Add packages under `internal/` as the
-project grows; a single 800-line `main.go` is not a design.
+```sh
+go test ./...
+go test -race ./...
+```
 
-**`docs/` has fixed names.** `docs/architecture.md` is due in week 7 and
-`docs/report.docx` at the end. `docs/README.md` explains both — read it, and do
-not edit or delete it.
+`cmd/app` contains startup and HTTP routing. `internal/version` provides build
+metadata. Add application packages under `internal/` as implementation progresses.
+Local data, credentials, and build output must stay outside version control.
 
-**Do not commit** `coverage/`, build output, or anything with a credential in
-it. `.gitignore` already covers the usual cases.
+## Submission documentation
+
+Student metadata is recorded in `atad.json`. The group is `-` because no group
+has been assigned.
+
+`docs/architecture.md` is due in week 7. The final report must be committed as
+`docs/report.docx`. See [documentation requirements](docs/README.md).

@@ -1,0 +1,30 @@
+# Local build and test output
+/bin/
+/dist/
+/build/
+/coverage/
+/coverage.out
+/coverage.html
+/app
+*.test
+*.prof
+
+# Local persistent state
+/data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Editor and operating system files
+.DS_Store
+.idea/
+.vscode/

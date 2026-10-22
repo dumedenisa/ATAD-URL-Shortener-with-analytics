@@ -1,11 +1,11 @@
 {
   "template": "atad-2026-2027-v1-go",
-  "name": "[Surname Firstname]",
-  "group": "[group]",
-  "student_id": 0,
-  "email": "[firstname.surname@student.upt.ro]",
-  "project": 0,
-  "project_title": "[title, exactly as in the project description]",
+  "name": "Dume Denisa",
+  "group": "-",
+  "student_id": "M374840",
+  "email": "denisa.dume@student.upt.ro",
+  "project": 1,
+  "project_title": "URL Shortener with Analytics",
   "language": "go",
-  "run_command": "docker run --rm -p 8080:8080 <image>"
+  "run_command": "docker run --rm -p 8080:8080 atad-url-shortener:local"
 }
