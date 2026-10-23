@@ -4,18 +4,20 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"atad-project/internal/storage"
 	"atad-project/internal/version"
 )
 
 func TestHealth(t *testing.T) {
 	started := time.Now().Add(-5 * time.Second)
 	w := httptest.NewRecorder()
-	NewHandler(started).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/health", nil))
+	NewHandler(started, testStore(t)).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/health", nil))
 
 	assertStatus(t, w, http.StatusOK)
 	assertContentType(t, w, "application/json")
@@ -34,7 +36,7 @@ func TestHealth(t *testing.T) {
 
 func TestVersion(t *testing.T) {
 	w := httptest.NewRecorder()
-	NewHandler(time.Now()).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/version", nil))
+	NewHandler(time.Now(), testStore(t)).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/version", nil))
 
 	assertStatus(t, w, http.StatusOK)
 	assertContentType(t, w, "application/json")
@@ -54,7 +56,7 @@ func TestVersion(t *testing.T) {
 
 func TestIdentity(t *testing.T) {
 	w := httptest.NewRecorder()
-	NewHandler(time.Now()).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	NewHandler(time.Now(), testStore(t)).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
 
 	assertStatus(t, w, http.StatusOK)
 	assertContentType(t, w, "text/html; charset=utf-8")
@@ -66,7 +68,7 @@ func TestIdentity(t *testing.T) {
 }
 
 func TestReset(t *testing.T) {
-	handler := NewHandler(time.Now())
+	handler := NewHandler(time.Now(), testStore(t))
 	// Reset remains safe to call repeatedly when there is no state yet.
 	for i := 0; i < 2; i++ {
 		w := httptest.NewRecorder()
@@ -79,7 +81,7 @@ func TestReset(t *testing.T) {
 }
 
 func TestRouteBoundaries(t *testing.T) {
-	handler := NewHandler(time.Now())
+	handler := NewHandler(time.Now(), testStore(t))
 	for _, tc := range []struct {
 		method string
 		path   string
@@ -112,4 +114,18 @@ func assertContentType(t *testing.T, w *httptest.ResponseRecorder, want string) 
 	if got := w.Header().Get("Content-Type"); got != want {
 		t.Errorf("Content-Type = %q, want %q", got, want)
 	}
+}
+
+func testStore(t *testing.T) *storage.Store {
+	t.Helper()
+	s, err := storage.Open(filepath.Join(t.TempDir(), "links.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := s.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	return s
 }

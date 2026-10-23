@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"atad-project/internal/httpapi"
+	"atad-project/internal/storage"
 	"atad-project/internal/version"
 )
 
@@ -40,9 +41,19 @@ func run() error {
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
+	databasePath := os.Getenv("DATABASE_PATH")
+	if databasePath == "" {
+		databasePath = "data/links.db"
+	}
+	store, err := storage.Open(databasePath)
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+
 	srv := &http.Server{
 		Addr:         ":8080",
-		Handler:      httpapi.NewHandler(started),
+		Handler:      httpapi.NewHandler(started, store),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,

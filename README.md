@@ -10,17 +10,18 @@ visitors to their original URLs, and report visit statistics for each link.
 
 ## Current status
 
-The repository contains the initial HTTP service and project metadata. The common
-routes are available: `GET /health`, `GET /version`, `GET /`, and `POST /reset`.
-The reset route currently returns 204; there is no application state to clear yet.
-The storage package now supports creating and reading persistent links in SQLite,
-with database-enforced unique codes and IDs starting at 1. Link creation through
-HTTP, redirects, and analytics updates are not implemented yet. The running
-HTTP service is not connected to storage yet.
+The service implements the common routes (`GET /health`, `GET /version`,
+`GET /`, `POST /reset`) and `POST /links` with a custom code. Links are saved
+in SQLite; duplicate codes return 409 without changing the existing link.
+Reset clears persistent links, statistics, and the ID sequence.
 
-The planned API is `POST /links`, `GET /links`, `GET /{code}`,
-`GET /links/{code}/stats`, and `DELETE /links/{code}`. Generated codes will contain
-7 characters; custom codes must contain 4–10 letters, digits, hyphens or underscores.
+Automatic code generation, redirects, listing, deletion, and statistics endpoints
+are not implemented yet. Until automatic generation is added, `code` is required.
+Custom codes contain 4–10 ASCII letters, digits, hyphens or underscores and are
+case-sensitive. The codes `health`, `version`, `reset`, and `links` are reserved
+and rejected with 400 validation. URLs must be absolute HTTP or HTTPS URLs with
+a host and no unescaped whitespace. Invalid JSON and invalid fields return
+400 with `{"error":"validation","message":"..."}`.
 
 ## Run with Docker
 
@@ -28,7 +29,7 @@ Build the image locally from the repository root:
 
 ```sh
 docker build -t atad-url-shortener:local .
-docker run --rm -p 8080:8080 atad-url-shortener:local
+docker run --rm -p 8080:8080 -v atad-links:/data atad-url-shortener:local
 ```
 
 No published image is required for these commands. The Dockerfile currently
@@ -58,6 +59,19 @@ curl -i -X POST http://localhost:8080/reset
 `commit`, and `built_at`; `/` returns an HTML identity page; `/reset` returns
 HTTP 204 with no response body.
 
+Create a custom link:
+
+```sh
+curl -i -H 'Content-Type: application/json' \
+  -d '{"url":"https://go.dev/doc/effective_go","code":"gofmt"}' \
+  http://localhost:8080/links
+```
+
+The response is HTTP 201 with exactly `id`, `code`, `url`, and `created_at`.
+Repeating the request returns HTTP 409 with `error: "conflict"`. Two simultaneous
+requests for the same code produce one 201 and one 409. A storage failure returns
+HTTP 500 with a JSON error and no database details.
+
 To inspect the version without starting the server:
 
 ```sh
@@ -77,6 +91,7 @@ go test -race ./...
 
 `cmd/app` handles process startup and graceful shutdown. `internal/httpapi`
 constructs the HTTP handler and tests the common routes without a network listener.
+`internal/storage` manages the persistent SQLite database.
 `internal/version` provides build metadata. Add application packages under
 `internal/` as implementation progresses.
 Local data, credentials, and build output must stay outside version control.
@@ -98,8 +113,12 @@ writes. Each store uses one connection. Tests cover collisions across two stores
 opening the same database file. Input validation belongs to the application
 layer and will be added with the link-creation endpoint.
 
-Database files under `data/` are ignored by Git. Keep the database on a persistent
-Docker volume when container storage is connected in a later step.
+The server opens `data/links.db` by default. Override it with `DATABASE_PATH`.
+The database is closed when the server exits, and `--version` does not open it.
+Database files under `data/` are ignored by Git. In Docker, the default path is
+`/data/links.db`, writable by the unprivileged application user. The named volume
+in the example preserves links when the container is removed and recreated.
+`POST /reset` permanently clears these persisted links too.
 
 ## Submission documentation
 

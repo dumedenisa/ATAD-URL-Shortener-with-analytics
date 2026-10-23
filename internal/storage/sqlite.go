@@ -127,3 +127,19 @@ func (s *Store) Get(ctx context.Context, code string) (Link, error) {
 	}
 	return link, nil
 }
+
+// Reset atomically clears all links, statistics, and the assigned ID sequence.
+func (s *Store) Reset(ctx context.Context) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin reset: %w", err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM links`); err != nil {
+		return fmt.Errorf("reset links: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM sqlite_sequence WHERE name = 'links'`); err != nil {
+		return fmt.Errorf("reset sequence: %w", err)
+	}
+	return tx.Commit()
+}

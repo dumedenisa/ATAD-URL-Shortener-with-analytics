@@ -39,7 +39,11 @@ LABEL org.opencontainers.image.title="URL Shortener with Analytics" \
 
 # Run as an unprivileged user. A container process that does not need root
 # should not have it.
-RUN adduser -D -u 10001 app
+RUN adduser -D -u 10001 app \
+    && mkdir /data \
+    && chown app:app /data
+
+ENV DATABASE_PATH=/data/links.db
 
 COPY --from=build /app /usr/local/bin/app
 USER app

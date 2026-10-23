@@ -2,17 +2,25 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
+	"atad-project/internal/storage"
 	"atad-project/internal/version"
 )
 
+// LinkStore supplies the persistent operations used by HTTP handlers.
+type LinkStore interface {
+	Create(context.Context, string, string) (storage.Link, error)
+	Reset(context.Context) error
+}
+
 // NewHandler constructs the application routes without opening a listener.
 // started is the process startup time used to report uptime.
-func NewHandler(started time.Time) http.Handler {
+func NewHandler(started time.Time, store LinkStore) http.Handler {
 	mux := http.NewServeMux()
 
 	// ---- the common contract: four routes, identical in every project -------
@@ -44,11 +52,14 @@ func NewHandler(started time.Time) http.Handler {
 	// state without restarting the container. If your project persists data,
 	// this clears what was persisted too.
 	mux.HandleFunc("POST /reset", func(w http.ResponseWriter, r *http.Request) {
-		// TODO: clear your own state here.
+		if err := store.Reset(r.Context()); err != nil {
+			writeError(w, http.StatusInternalServerError, "internal", "could not reset stored links")
+			return
+		}
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	// ---- your own routes go below -------------------------------------------
+	mux.HandleFunc("POST /links", createLink(store))
 
 	return mux
 }
