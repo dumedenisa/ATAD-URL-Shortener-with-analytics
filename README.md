@@ -13,7 +13,10 @@ visitors to their original URLs, and report visit statistics for each link.
 The repository contains the initial HTTP service and project metadata. The common
 routes are available: `GET /health`, `GET /version`, `GET /`, and `POST /reset`.
 The reset route currently returns 204; there is no application state to clear yet.
-Link creation, redirects, analytics, and persistence are not implemented yet.
+The storage package now supports creating and reading persistent links in SQLite,
+with database-enforced unique codes and IDs starting at 1. Link creation through
+HTTP, redirects, and analytics updates are not implemented yet. The running
+HTTP service is not connected to storage yet.
 
 The planned API is `POST /links`, `GET /links`, `GET /{code}`,
 `GET /links/{code}/stats`, and `DELETE /links/{code}`. Generated codes will contain
@@ -77,6 +80,26 @@ constructs the HTTP handler and tests the common routes without a network listen
 `internal/version` provides build metadata. Add application packages under
 `internal/` as implementation progresses.
 Local data, credentials, and build output must stay outside version control.
+
+## Persistent storage
+
+`internal/storage` uses SQLite through the pure-Go `modernc.org/sqlite` driver,
+compatible with `CGO_ENABLED=0`. `storage.Open(path)` creates the database and
+missing parent directories; the caller closes the store when finished.
+
+The database stores ID, case-sensitive unique code, destination URL, UTC creation
+time, visit count (initially zero), and last visit time (initially null). Inserts
+are atomic: a duplicate returns `storage.ErrCodeTaken` without overwriting the
+existing link. Missing lookups return `storage.ErrNotFound`. IDs and data survive
+closing and reopening the database. Reads do not increment visits.
+
+SQLite serializes writes, with a five-second busy timeout and full synchronous
+writes. Each store uses one connection. Tests cover collisions across two stores
+opening the same database file. Input validation belongs to the application
+layer and will be added with the link-creation endpoint.
+
+Database files under `data/` are ignored by Git. Keep the database on a persistent
+Docker volume when container storage is connected in a later step.
 
 ## Submission documentation
 
