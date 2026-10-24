@@ -63,7 +63,6 @@ func TestCreateValidation(t *testing.T) {
 		`{"url":"https://example.org","code":"okay","extra":1}`,
 		`{"url":"https://example.org","code":"okay"} {}`,
 		`{"url":"https://example.org","code":"okay"} garbage`,
-		`{"url":"https://example.org"}`, `{"url":"https://example.org","code":null}`,
 	} {
 		t.Run(body, func(t *testing.T) {
 			assertAPIError(t, postLink(handler, body), http.StatusBadRequest, "validation")

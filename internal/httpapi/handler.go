@@ -59,7 +59,7 @@ func NewHandler(started time.Time, store LinkStore) http.Handler {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	mux.HandleFunc("POST /links", createLink(store))
+	mux.HandleFunc("POST /links", createLink(store, generateCode))
 
 	return mux
 }

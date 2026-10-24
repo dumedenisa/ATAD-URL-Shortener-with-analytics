@@ -11,12 +11,12 @@ visitors to their original URLs, and report visit statistics for each link.
 ## Current status
 
 The service implements the common routes (`GET /health`, `GET /version`,
-`GET /`, `POST /reset`) and `POST /links` with a custom code. Links are saved
+`GET /`, `POST /reset`) and `POST /links` with an optional custom code. Links are saved
 in SQLite; duplicate codes return 409 without changing the existing link.
 Reset clears persistent links, statistics, and the ID sequence.
 
-Automatic code generation, redirects, listing, deletion, and statistics endpoints
-are not implemented yet. Until automatic generation is added, `code` is required.
+Redirects, listing, deletion, and statistics endpoints are not implemented yet.
+Omitting `code` (or supplying null) generates a code of exactly 7 characters.
 Custom codes contain 4–10 ASCII letters, digits, hyphens or underscores and are
 case-sensitive. The codes `health`, `version`, `reset`, and `links` are reserved
 and rejected with 400 validation. URLs must be absolute HTTP or HTTPS URLs with
@@ -66,6 +66,22 @@ curl -i -H 'Content-Type: application/json' \
   -d '{"url":"https://go.dev/doc/effective_go","code":"gofmt"}' \
   http://localhost:8080/links
 ```
+
+To generate a code automatically:
+
+```sh
+curl -i -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.org"}' http://localhost:8080/links
+```
+
+Generated codes use `crypto/rand` and the 64-character alphabet
+`A-Z a-z 0-9 - _`. The database insert decides uniqueness atomically. A generated
+collision triggers a new attempt; reserved route names are skipped. There are at
+most 32 attempts per request. Exhaustion, a generator failure, or a database
+failure returns HTTP 500 with a JSON error. Custom-code conflicts still return
+409 immediately and never change the requested code. Tests inject a generator to
+force repeated collisions, exhaustion, and a collision between concurrent requests.
+No new dependencies are required for generation.
 
 The response is HTTP 201 with exactly `id`, `code`, `url`, and `created_at`.
 Repeating the request returns HTTP 409 with `error: "conflict"`. Two simultaneous
