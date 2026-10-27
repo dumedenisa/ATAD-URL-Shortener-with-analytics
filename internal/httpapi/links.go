@@ -35,8 +35,7 @@ func createLink(store LinkStore, generate func() (string, error)) http.HandlerFu
 			writeError(w, http.StatusBadRequest, "validation", "body must contain exactly one JSON object")
 			return
 		}
-		parsed, err := url.Parse(input.URL)
-		if err != nil || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") || strings.ContainsAny(input.URL, " \t\r\n") {
+		if !validDestination(input.URL) {
 			writeError(w, http.StatusBadRequest, "validation", "url must be an absolute http or https URL with a host and no unescaped whitespace")
 			return
 		}
@@ -51,6 +50,7 @@ func createLink(store LinkStore, generate func() (string, error)) http.HandlerFu
 			}
 		}
 		var link storage.Link
+		var err error
 		if input.Code == nil {
 			link, err = createGeneratedLink(r.Context(), store, input.URL, generate)
 		} else {
@@ -122,4 +122,11 @@ func createGeneratedLink(ctx context.Context, store LinkStore, destination strin
 		return link, err
 	}
 	return storage.Link{}, errors.New("could not allocate a unique code within the retry limit")
+}
+
+func validDestination(destination string) bool {
+	parsed, err := url.Parse(destination)
+	return err == nil && parsed.Hostname() != "" &&
+		(parsed.Scheme == "http" || parsed.Scheme == "https") &&
+		!strings.ContainsAny(destination, " \t\r\n")
 }

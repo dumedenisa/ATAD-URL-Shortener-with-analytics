@@ -15,7 +15,8 @@ The service implements the common routes (`GET /health`, `GET /version`,
 in SQLite; duplicate codes return 409 without changing the existing link.
 Reset clears persistent links, statistics, and the ID sequence.
 
-Redirects, listing, deletion, and statistics endpoints are not implemented yet.
+`GET /{code}` now redirects to a stored destination with HTTP 302.
+Listing, deletion, visit counting, and statistics endpoints are not implemented yet.
 Omitting `code` (or supplying null) generates a code of exactly 7 characters.
 Custom codes contain 4–10 ASCII letters, digits, hyphens or underscores and are
 case-sensitive. The codes `health`, `version`, `reset`, and `links` are reserved
@@ -88,6 +89,24 @@ Repeating the request returns HTTP 409 with `error: "conflict"`. Two simultaneou
 requests for the same code produce one 201 and one 409. A storage failure returns
 HTTP 500 with a JSON error and no database details.
 
+Visit a short link without automatically following the redirect:
+
+```sh
+curl -i http://localhost:8080/gofmt
+```
+
+The response is HTTP 302 with `Location: https://go.dev/doc/effective_go`.
+Unknown codes return HTTP 404 with `error: "not_found"`. Codes are case-sensitive.
+An invalid destination already present in storage returns HTTP 422 with
+`error: "unprocessable"`; storage failures return HTTP 500. A broken link means
+an invalid stored URL here; the service does not contact destinations to check
+their availability. HEAD returns the same redirect headers with no body.
+
+The redirect path is HTTP routing → one indexed SQLite lookup by code → stored
+URL validation → HTTP 302. Existing application routes take precedence over the
+short-code route; GET on the POST-only `/reset` and `/links` returns 405.
+Redirects currently do not update visit statistics; that is the next step.
+
 To inspect the version without starting the server:
 
 ```sh
@@ -126,8 +145,8 @@ closing and reopening the database. Reads do not increment visits.
 
 SQLite serializes writes, with a five-second busy timeout and full synchronous
 writes. Each store uses one connection. Tests cover collisions across two stores
-opening the same database file. Input validation belongs to the application
-layer and will be added with the link-creation endpoint.
+opening the same database file. Input validation belongs to the HTTP application layer and is enforced by the
+link-creation endpoint.
 
 The server opens `data/links.db` by default. Override it with `DATABASE_PATH`.
 The database is closed when the server exits, and `--version` does not open it.
