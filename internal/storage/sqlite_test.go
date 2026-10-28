@@ -134,3 +134,49 @@ func TestOpenErrors(t *testing.T) {
 		t.Fatal("expected database directory path to fail")
 	}
 }
+
+func TestConcurrentVisitUpdatesAcrossStores(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "visits.db")
+	stores := []*storage.Store{openStore(t, path), openStore(t, path)}
+	ctx := context.Background()
+	link, err := stores[0].Create(ctx, "visits", "https://example.org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const count = 30
+	var wg sync.WaitGroup
+	for i := 0; i < count; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			if err := stores[i%2].RecordVisit(ctx, link); err != nil {
+				t.Error(err)
+			}
+		}(i)
+	}
+	wg.Wait()
+	got, err := stores[0].Get(ctx, link.Code)
+	if err != nil || got.Visits != count || got.LastVisitAt == nil {
+		t.Fatalf("visits: %+v, %v", got, err)
+	}
+	if err := stores[0].Reset(ctx); err != nil {
+		t.Fatal(err)
+	}
+	replacement, err := stores[0].Create(ctx, link.Code, link.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replacement.ID != link.ID {
+		t.Fatal("test requires reused ID")
+	}
+	if err := stores[1].RecordVisit(ctx, link); !errors.Is(err, storage.ErrNotFound) {
+		t.Fatalf("stale visit affected replacement: %v", err)
+	}
+	got, err = stores[0].Get(ctx, link.Code)
+	if err != nil || got.Visits != 0 || got.LastVisitAt != nil {
+		t.Fatalf("replacement stats: %+v, %v", got, err)
+	}
+	if err := stores[0].RecordVisit(ctx, replacement); err != nil {
+		t.Fatal(err)
+	}
+}

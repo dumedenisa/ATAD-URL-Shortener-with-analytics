@@ -143,3 +143,24 @@ func (s *Store) Reset(ctx context.Context) error {
 	}
 	return tx.Commit()
 }
+
+// RecordVisit atomically increments the count and timestamps the visit at SQL
+// execution time (UTC, millisecond precision). The link identity guards against
+// a reset/recreation between lookup and update, including reused numeric IDs.
+func (s *Store) RecordVisit(ctx context.Context, link Link) error {
+	result, err := s.db.ExecContext(ctx, `UPDATE links
+		SET visits = visits + 1, last_visit_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+		WHERE id = ? AND code = ? AND url = ? AND created_at = ?`,
+		link.ID, link.Code, link.URL, link.CreatedAt.Format(time.RFC3339Nano))
+	if err != nil {
+		return fmt.Errorf("record visit: %w", err)
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("visit affected rows: %w", err)
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

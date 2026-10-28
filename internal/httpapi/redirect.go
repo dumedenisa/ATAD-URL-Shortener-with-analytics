@@ -32,6 +32,18 @@ func redirectLink(store LinkStore) http.HandlerFunc {
 			writeError(w, http.StatusUnprocessableEntity, "unprocessable", "stored link has an invalid destination URL")
 			return
 		}
+		// Persist before serving the redirect: a failed write must not produce
+		// an uncounted 302. HEAD is a metadata request and does not count.
+		if r.Method == http.MethodGet {
+			if err := store.RecordVisit(r.Context(), link); err != nil {
+				if errors.Is(err, storage.ErrNotFound) {
+					writeError(w, http.StatusNotFound, "not_found", "short code was removed before the redirect")
+				} else {
+					writeError(w, http.StatusInternalServerError, "internal", "could not record visit")
+				}
+				return
+			}
+		}
 		http.Redirect(w, r, link.URL, http.StatusFound)
 	}
 }

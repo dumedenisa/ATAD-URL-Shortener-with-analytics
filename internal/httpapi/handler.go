@@ -16,6 +16,7 @@ import (
 type LinkStore interface {
 	Create(context.Context, string, string) (storage.Link, error)
 	Get(context.Context, string) (storage.Link, error)
+	RecordVisit(context.Context, storage.Link) error
 	Reset(context.Context) error
 }
 
@@ -62,6 +63,7 @@ func NewHandler(started time.Time, store LinkStore) http.Handler {
 
 	mux.HandleFunc("POST /links", createLink(store, generateCode))
 	mux.HandleFunc("GET /{code}", redirectLink(store))
+	mux.HandleFunc("GET /links/{code}/stats", linkStats(store))
 
 	return mux
 }

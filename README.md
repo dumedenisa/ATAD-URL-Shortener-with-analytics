@@ -16,7 +16,8 @@ in SQLite; duplicate codes return 409 without changing the existing link.
 Reset clears persistent links, statistics, and the ID sequence.
 
 `GET /{code}` now redirects to a stored destination with HTTP 302.
-Listing, deletion, visit counting, and statistics endpoints are not implemented yet.
+Visit counting and `GET /links/{code}/stats` are implemented.
+Listing and deletion endpoints are not implemented yet.
 Omitting `code` (or supplying null) generates a code of exactly 7 characters.
 Custom codes contain 4–10 ASCII letters, digits, hyphens or underscores and are
 case-sensitive. The codes `health`, `version`, `reset`, and `links` are reserved
@@ -103,9 +104,32 @@ an invalid stored URL here; the service does not contact destinations to check
 their availability. HEAD returns the same redirect headers with no body.
 
 The redirect path is HTTP routing → one indexed SQLite lookup by code → stored
-URL validation → HTTP 302. Existing application routes take precedence over the
+URL validation → atomic visit update → HTTP 302. Existing application routes take precedence over the
 short-code route; GET on the POST-only `/reset` and `/links` returns 405.
-Redirects currently do not update visit statistics; that is the next step.
+GET redirects increment the visit count; HEAD only returns metadata and does not
+count. Broken links, missing codes, and failed database writes do not count.
+
+Read statistics twice after one GET redirect:
+
+```sh
+curl -i http://localhost:8080/links/gofmt/stats
+curl -i http://localhost:8080/links/gofmt/stats
+```
+
+Both responses report `visits: 1` and the same `last_visit_at`. The endpoint
+returns HTTP 200 and exactly `code`, `visits`, and `last_visit_at`. Before the
+first visit, `visits` is 0 and `last_visit_at` is null. Timestamps use UTC with
+millisecond precision. Unknown codes return JSON 404; database failures return
+JSON 500. Statistics survive restart and are cleared by `POST /reset`.
+
+Visits are persisted synchronously before sending HTTP 302, with an atomic SQL
+increment to avoid lost concurrent updates. Failure to save returns an error
+without a redirect. This adds a database write to redirect latency. A process
+crash or client disconnect after the commit but before receipt of the response
+can leave a counted visit without a delivered redirect: the database commit and
+HTTP delivery are not atomic. There is no background queue to lose on shutdown.
+A reset/recreation between lookup and update cannot increment the new link's
+counter: the update matches the original ID, code, URL, and creation timestamp.
 
 To inspect the version without starting the server:
 
