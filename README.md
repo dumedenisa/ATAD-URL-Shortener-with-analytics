@@ -1,7 +1,7 @@
 # URL Shortener with Analytics
 
-ATAD 2026–2027, project 1: a Go service that will create short links, redirect
-visitors to their original URLs, and report visit statistics for each link.
+ATAD 2026–2027, project 1: a Go service that creates short links, redirects
+visitors to their original URLs, and reports visit statistics for each link.
 
 - **Student:** Dume Denisa
 - **Group:** -
@@ -17,7 +17,8 @@ Reset clears persistent links, statistics, and the ID sequence.
 
 `GET /{code}` now redirects to a stored destination with HTTP 302.
 Visit counting and `GET /links/{code}/stats` are implemented.
-Listing and deletion endpoints are not implemented yet.
+`GET /links` lists links newest first; `DELETE /links/{code}` removes a link
+and its statistics. All project routes are now implemented.
 Omitting `code` (or supplying null) generates a code of exactly 7 characters.
 Custom codes contain 4–10 ASCII letters, digits, hyphens or underscores and are
 case-sensitive. The codes `health`, `version`, `reset`, and `links` are reserved
@@ -105,7 +106,7 @@ their availability. HEAD returns the same redirect headers with no body.
 
 The redirect path is HTTP routing → one indexed SQLite lookup by code → stored
 URL validation → atomic visit update → HTTP 302. Existing application routes take precedence over the
-short-code route; GET on the POST-only `/reset` and `/links` returns 405.
+short-code route; GET on the POST-only `/reset` returns 405.
 GET redirects increment the visit count; HEAD only returns metadata and does not
 count. Broken links, missing codes, and failed database writes do not count.
 
@@ -130,6 +131,29 @@ can leave a counted visit without a delivered redirect: the database commit and
 HTTP delivery are not atomic. There is no background queue to lose on shutdown.
 A reset/recreation between lookup and update cannot increment the new link's
 counter: the update matches the original ID, code, URL, and creation timestamp.
+
+List links, newest first:
+
+```sh
+curl -i http://localhost:8080/links
+```
+
+The response is HTTP 200 with a JSON array. Each item has `id`, `code`, `url`,
+and `created_at`; an empty list is `[]`. Ordering follows descending IDs
+(insertion order), so equal timestamps or a clock adjustment do not make the
+order ambiguous. Reading the list does not count as a visit.
+
+Delete a link and its statistics:
+
+```sh
+curl -i -X DELETE http://localhost:8080/links/gofmt
+```
+
+A successful deletion returns HTTP 204 without a body; an unknown code returns
+JSON 404. The deleted code no longer redirects or has statistics. It can be
+created again with a new ID and zero visits. Deletion does not reset the ID
+sequence. Listing or deletion failures in storage return JSON 500. Changes
+survive restart; `POST /reset` removes everything and restarts IDs at 1.
 
 To inspect the version without starting the server:
 

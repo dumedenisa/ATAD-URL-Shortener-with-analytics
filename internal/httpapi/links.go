@@ -65,12 +65,7 @@ func createLink(store LinkStore, generate func() (string, error)) http.HandlerFu
 			return
 		}
 		// Creation exposes only the four fields specified by the project API.
-		writeJSON(w, http.StatusCreated, struct {
-			ID        int64     `json:"id"`
-			Code      string    `json:"code"`
-			URL       string    `json:"url"`
-			CreatedAt time.Time `json:"created_at"`
-		}{link.ID, link.Code, link.URL, link.CreatedAt})
+		writeJSON(w, http.StatusCreated, responseForLink(link))
 	}
 }
 
@@ -129,4 +124,46 @@ func validDestination(destination string) bool {
 	return err == nil && parsed.Hostname() != "" &&
 		(parsed.Scheme == "http" || parsed.Scheme == "https") &&
 		!strings.ContainsAny(destination, " \t\r\n")
+}
+
+// linkResponse keeps creation/list metadata separate from the stats endpoint.
+type linkResponse struct {
+	ID        int64     `json:"id"`
+	Code      string    `json:"code"`
+	URL       string    `json:"url"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func responseForLink(link storage.Link) linkResponse {
+	return linkResponse{link.ID, link.Code, link.URL, link.CreatedAt}
+}
+
+func listLinks(store LinkStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		links, err := store.List(r.Context())
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "internal", "could not list links")
+			return
+		}
+		response := make([]linkResponse, 0, len(links))
+		for _, link := range links {
+			response = append(response, responseForLink(link))
+		}
+		writeJSON(w, http.StatusOK, response)
+	}
+}
+
+func deleteLink(store LinkStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		err := store.Delete(r.Context(), r.PathValue("code"))
+		if errors.Is(err, storage.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not_found", "short code was not found")
+			return
+		}
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "internal", "could not delete link")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
 }

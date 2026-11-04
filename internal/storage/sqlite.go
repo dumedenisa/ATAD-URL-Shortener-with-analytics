@@ -102,12 +102,15 @@ func (s *Store) Create(ctx context.Context, code, destination string) (Link, err
 
 // Get reads a link without changing its visit statistics.
 func (s *Store) Get(ctx context.Context, code string) (Link, error) {
+	return scanLink(s.db.QueryRowContext(ctx,
+		`SELECT id, code, url, created_at, visits, last_visit_at FROM links WHERE code = ?`, code))
+}
+
+func scanLink(row interface{ Scan(...any) error }) (Link, error) {
 	var link Link
 	var created string
 	var last sql.NullString
-	err := s.db.QueryRowContext(ctx,
-		`SELECT id, code, url, created_at, visits, last_visit_at FROM links WHERE code = ?`,
-		code).Scan(&link.ID, &link.Code, &link.URL, &created, &link.Visits, &last)
+	err := row.Scan(&link.ID, &link.Code, &link.URL, &created, &link.Visits, &last)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Link{}, ErrNotFound
 	}
@@ -158,6 +161,46 @@ func (s *Store) RecordVisit(ctx context.Context, link Link) error {
 	n, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("visit affected rows: %w", err)
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// List returns links in reverse insertion order. IDs provide a deterministic
+// order even when timestamps are equal or the system clock moves backwards.
+func (s *Store) List(ctx context.Context) ([]Link, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, code, url, created_at, visits, last_visit_at FROM links ORDER BY id DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("list links: %w", err)
+	}
+	defer rows.Close()
+	links := make([]Link, 0)
+	for rows.Next() {
+		link, err := scanLink(rows)
+		if err != nil {
+			return nil, err
+		}
+		links = append(links, link)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read links: %w", err)
+	}
+	return links, nil
+}
+
+// Delete removes the link and its statistics in one atomic statement.
+// Assigned IDs are never reused by deletion; only Reset restarts the sequence.
+func (s *Store) Delete(ctx context.Context, code string) error {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM links WHERE code = ?`, code)
+	if err != nil {
+		return fmt.Errorf("delete link: %w", err)
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("delete affected rows: %w", err)
 	}
 	if n == 0 {
 		return ErrNotFound

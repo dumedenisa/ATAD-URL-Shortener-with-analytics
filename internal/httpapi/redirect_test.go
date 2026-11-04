@@ -98,7 +98,7 @@ func TestRedirectFailures(t *testing.T) {
 
 func TestRedirectRouteBoundaries(t *testing.T) {
 	handler := NewHandler(time.Now(), testStore(t))
-	for _, path := range []string{"/links", "/reset"} {
+	for _, path := range []string{"/reset"} {
 		w := visit(handler, http.MethodGet, path)
 		assertAPIError(t, w, http.StatusMethodNotAllowed, "method_not_allowed")
 		if w.Header().Get("Allow") != "POST" {

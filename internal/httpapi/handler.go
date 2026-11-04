@@ -18,6 +18,8 @@ type LinkStore interface {
 	Get(context.Context, string) (storage.Link, error)
 	RecordVisit(context.Context, storage.Link) error
 	Reset(context.Context) error
+	List(context.Context) ([]storage.Link, error)
+	Delete(context.Context, string) error
 }
 
 // NewHandler constructs the application routes without opening a listener.
@@ -62,6 +64,8 @@ func NewHandler(started time.Time, store LinkStore) http.Handler {
 	})
 
 	mux.HandleFunc("POST /links", createLink(store, generateCode))
+	mux.HandleFunc("GET /links", listLinks(store))
+	mux.HandleFunc("DELETE /links/{code}", deleteLink(store))
 	mux.HandleFunc("GET /{code}", redirectLink(store))
 	mux.HandleFunc("GET /links/{code}/stats", linkStats(store))
 
