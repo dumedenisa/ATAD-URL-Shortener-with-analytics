@@ -223,5 +223,6 @@ in the example preserves links when the container is removed and recreated.
 Student metadata is recorded in `atad.json`. The group is `-` because no group
 has been assigned.
 
-`docs/architecture.md` is due in week 7. The final report must be committed as
+The [architecture note](docs/architecture.md) describes request flow, persistent
+data, design decisions, and remaining work; it is due in week 7. The final report must be committed as
 `docs/report.docx`. See [documentation requirements](docs/README.md).
