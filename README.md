@@ -170,6 +170,21 @@ when build metadata is unavailable.
 ```sh
 go test ./...
 go test -race ./...
+go vet ./...
+```
+
+`tests/integration` runs the API through a real local HTTP server and temporary
+SQLite files. The client deliberately does not follow redirects or contact
+external destinations. The suite covers creation, generated codes, conflicts,
+redirect headers, repeated statistics reads, HEAD responses, listing, deletion,
+reset, and closing/reopening the server and database. Concurrent HTTP redirects
+are checked for lost visits. Tests use isolated temporary data and never reset
+the database of a running application.
+
+Run just the integration suite:
+
+```sh
+go test -race ./tests/integration
 ```
 
 `cmd/app` handles process startup and graceful shutdown. `internal/httpapi`
