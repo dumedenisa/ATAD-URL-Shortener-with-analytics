@@ -26,19 +26,39 @@ and rejected with 400 validation. URLs must be absolute HTTP or HTTPS URLs with
 a host and no unescaped whitespace. Invalid JSON and invalid fields return
 400 with `{"error":"validation","message":"..."}`.
 
-## Run with Docker
-
-Build the image locally from the repository root:
+## Run the published image
 
 ```sh
-docker build -t atad-url-shortener:local .
+docker run --rm -p 8080:8080 -v atad-links:/data \
+  ghcr.io/dumedenisa/atad-url-shortener-with-analytics:latest
+```
+
+Open http://localhost:8080/ for the identity page. The named volume preserves
+links and statistics across container replacement. `POST /reset` clears it.
+
+GitHub Actions publishes `latest` and `sha-<full commit SHA>` tags after tests and
+the Docker smoke check pass. Images support Linux AMD64 and ARM64. Check the
+[latest workflow run](https://github.com/dumedenisa/ATAD-URL-Shortener-with-analytics/actions)
+for publication status. The first GHCR package may need its visibility set to
+Public in GitHub package settings to allow anonymous pulls. For private access,
+use `docker login ghcr.io` with a token authorized for that package.
+
+## Build locally with Docker
+
+```sh
+docker build --build-arg COMMIT="$(git rev-parse HEAD)" \
+  --build-arg BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  -t atad-url-shortener:local .
 docker run --rm -p 8080:8080 -v atad-links:/data atad-url-shortener:local
 ```
 
-No published image is required for these commands. The Dockerfile currently
-requires the `golang:1.27-alpine` build image specified by the starter template.
-Build metadata can be supplied through the `COMMIT` and `BUILT_AT` build arguments.
-The build injects these values into the binary used by `/version` and `--version`.
+The two-stage build uses Go 1.27 and runs without root (UID 10001). `COMMIT`,
+`BUILT_AT`, and optional `VERSION` (default `0.1.0`) are embedded in the binary.
+Both `/version` and `--version` expose those values.
+
+On macOS, Docker Desktop or Docker CLI with Colima provides the container engine.
+With Colima installed, run `colima start` before Docker commands and
+`colima stop` when finished. Go alone is enough to run or test without Docker.
 
 ## Run without Docker
 
@@ -194,6 +214,26 @@ constructs the HTTP handler and tests the common routes without a network listen
 `internal/` as implementation progresses.
 Local data, credentials, and build output must stay outside version control.
 
+## Verify the container
+
+After the local build above:
+
+```sh
+python3 scripts/smoke_container.py atad-url-shortener:local \
+  --commit "$(git rev-parse HEAD)"
+```
+
+This uses disposable containers, a random localhost port, and a temporary named
+volume. It checks identity, build metadata, non-root execution, creation,
+redirects, statistics, deletion, reset, and volume persistence after container
+replacement. It deletes only its own temporary containers and volume. Python 3
+and a running Docker engine are required; no Python packages are needed.
+
+The workflow runs Go tests and this check on pull requests. Pushes to `main`,
+version tags, or manual runs additionally publish to GHCR using the workflow's
+`GITHUB_TOKEN`; no registry password is committed. Publication is conditional on
+successful tests. Both source and the image's reported commit identify a build.
+
 ## Persistent storage
 
 `internal/storage` uses SQLite through the pure-Go `modernc.org/sqlite` driver,
@@ -224,5 +264,12 @@ Student metadata is recorded in `atad.json`. The group is `-` because no group
 has been assigned.
 
 The [architecture note](docs/architecture.md) describes request flow, persistent
-data, design decisions, and remaining work; it is due in week 7. The final report must be committed as
-`docs/report.docx`. See [documentation requirements](docs/README.md).
+data, design decisions, and remaining work; it is due in week 7.
+The final report is [docs/report.docx](docs/report.docx).
+Its editable source is [docs/report.md](docs/report.md); regenerate it with
+`python3 scripts/build_report.py` (Python standard library only).
+
+For submission, provide the repository URL and published image URL as required
+by the course guide. Verify package access and the latest successful workflow
+before submitting. The report is committed in Git, not uploaded separately to
+Virtual Campus. See [documentation requirements](docs/README.md).

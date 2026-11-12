@@ -57,8 +57,11 @@ Tests cover collisions, concurrency, HTTP contracts, restart persistence,
 deletion, and reset, including a real HTTP server with temporary databases.
 Tests and the race detector pass; clients do not follow external redirects.
 
-All specified application routes are implemented. Still pending are CI and
-container image publication, end-to-end validation of the published image and
-its build metadata/volume permissions, and `docs/report.docx`. No latency
-benchmark or crash/power-loss recovery experiment has been performed. The common
-course guide's additional submission and assessment rules still need checking.
+All specified application routes are implemented. The CI workflow tests and
+smoke-checks Docker before publishing AMD64/ARM64 images to GHCR. The local
+Docker smoke test verifies non-root execution, build metadata, and persistence
+through container replacement. The final report is `docs/report.docx`.
+Publication status and package access must be checked in GitHub Actions/GHCR.
+No latency benchmark or crash/power-loss recovery experiment has been performed.
+The common course guide's additional submission and assessment rules still
+need checking.
