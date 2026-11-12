@@ -28,3 +28,7 @@
 .DS_Store
 .idea/
 .vscode/
+
+# Python helper caches
+__pycache__/
+*.py[cod]

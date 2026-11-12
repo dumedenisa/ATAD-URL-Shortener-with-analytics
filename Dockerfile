@@ -12,7 +12,7 @@ WORKDIR /src
 
 # Copy the module files first and download dependencies as their own layer.
 # Docker caches that layer, so editing your source does not re-download anything.
-COPY go.mod go.sum* ./
+COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
@@ -20,12 +20,14 @@ COPY . .
 # COMMIT and BUILT_AT are supplied by the CI workflow; see .github/workflows/ci.yml.
 ARG COMMIT=dev
 ARG BUILT_AT=unknown
+ARG VERSION=0.1.0
 
 # CGO_ENABLED=0 produces a static binary that runs on Alpine with no extra
 # libraries. -s -w strip debug information and shrink the result.
 # -X sets a string variable at link time: this is how the build stamps itself.
 RUN CGO_ENABLED=0 go build \
       -ldflags="-s -w \
+        -X atad-project/internal/version.Version=${VERSION} \
         -X atad-project/internal/version.Commit=${COMMIT} \
         -X atad-project/internal/version.BuiltAt=${BUILT_AT}" \
       -o /app ./cmd/app
